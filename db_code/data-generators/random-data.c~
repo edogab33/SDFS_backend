@@ -1,0 +1,46 @@
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <math.h>
+
+#define myrandom()  (((double) rand())/((double) RAND_MAX))
+
+int main() {
+    
+  long long unsigned int x, y;
+
+
+  /*   prg  */
+  
+  /* Intialize random number generator */
+
+  
+srand((unsigned) time(0));
+
+ 
+   
+for (y=2130995; y <= 2121005; y = y - 10)
+   {  /*  begin for y  */
+  
+     for (x=4559505; x <= 4569495; x = x + 10)
+       {  /*  begin for x  */
+    
+	 printf("%llu , %llu ,   \n",
+		x,   /*  x coordinate */
+		y,   /*  y coordinate */
+		(long long unsigned int) round(4380*myrandom()), /* altimetry */
+		(long long unsigned int) round(255*myrandom()), /* forest */
+		(long long unsigned int) round(255*myrandom()), /* urbanization */
+		(long long unsigned int) round(255*myrandom()), /* water1 */
+		(long long unsigned int) round(myrandom()), /* water2 */
+		(long long unsigned int) round(90*myrandom()), /* carta natura */
+		   
+       }  /*  end for x  */
+ 
+   }  /*  end for y  */
+ 
+    return 0;
+    
+}  /* end main()  */
+
+

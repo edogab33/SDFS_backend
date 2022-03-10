@@ -1,0 +1,9 @@
+#!/bin/sh
+
+make
+
+./rmap > satellite-map.csv
+
+./rweather > weather.csv
+
+./rinit > init-state.csv
