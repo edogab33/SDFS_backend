@@ -4,7 +4,7 @@ const cors = require('cors');
 const db = require('./queries')
 
 const app = express()
-const port = 3000
+const port = 4000
 
 var corsOptions = {
     origin: 'http://localhost:4200',
@@ -24,7 +24,8 @@ app.get('/', (request, response) => {
 })
 
 app.get('/requests', db.getRequests)
-app.get('/grid/:num', db.getGrid)
+app.get('/grid/:x0/:y0/:xn/:yn', db.getGrid)
+app.get('/coords', db.getCoords)
 
 app.listen(port, () => {
     console.log('App running on port '+port)
