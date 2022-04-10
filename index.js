@@ -20,12 +20,14 @@ app.use(
 )
 
 app.get('/', (request, response) => {
+    response.header("Access-Control-Allow-Origin", "*");
     response.json({ info: 'Node.js, Express, and Postgres API' })
 })
 
 app.get('/requests', db.getRequests)
 app.get('/grid/:x0/:y0/:xn/:yn', db.getGrid)
 app.get('/coords', db.getCoords)
+app.post('/start', db.startSimulation)
 
 app.listen(port, () => {
     console.log('App running on port '+port)

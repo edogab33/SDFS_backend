@@ -34,7 +34,6 @@ function toGeoJson(rows) {
   return obj
 } 
 
-// too slow, a converted coords table in the DB might be needed in the future
 const getGrid = async (req, res, next) => {
   var coords = [parseInt(req.params.x0), parseInt(req.params.xn), parseInt(req.params.y0), parseInt(req.params.yn)]
   pool.query('SELECT swx, swy FROM satellitemaps WHERE (swx >= '+coords[0]+' AND swx <= '+coords[1]+') '+
@@ -44,8 +43,15 @@ const getGrid = async (req, res, next) => {
       }
       data = result.rows
       grid = toGeoJson(data)
+      res.header("Access-Control-Allow-Origin", "*");
       res.status(200).json(grid)
     })
+}
+
+const startSimulation = async (req, res) => {
+  initialState = req.body.initialState
+  console.log(initialState)
+  res.status(200)
 }
 
 const getCoords = (request, response) => {
@@ -70,5 +76,6 @@ const getRequests = (request, response) => {
 module.exports = {
   getRequests,
   getGrid,
-  getCoords
+  getCoords,
+  startSimulation
 }
