@@ -36,12 +36,9 @@ function toGeoJson(rows) {
 
 // too slow, a converted coords table in the DB might be needed in the future
 const getGrid = async (req, res, next) => {
-  const x0 = parseInt(req.params.x0)
-  const y0 = parseInt(req.params.y0)
-  const xn = parseInt(req.params.xn)
-  const yn = parseInt(req.params.yn)
-  pool.query('SELECT swx, swy FROM satellitemaps WHERE (swx >= '+x0+' AND swx <= '+xn+') '+
-    'AND (swy >= '+y0+' AND swy <= '+yn+')', (error, result) => {
+  var coords = [parseInt(req.params.x0), parseInt(req.params.xn), parseInt(req.params.y0), parseInt(req.params.yn)]
+  pool.query('SELECT swx, swy FROM satellitemaps WHERE (swx >= '+coords[0]+' AND swx <= '+coords[1]+') '+
+    'AND (swy >= '+coords[2]+' AND swy <= '+coords[3]+')', (error, result) => {
       if (error) {
         res.status(500).send(error)
       }
