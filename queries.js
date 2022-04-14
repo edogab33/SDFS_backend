@@ -10,6 +10,10 @@ const pool = new Pool({
 function toGeoJson(rows) {
   var obj = {
     type: "FeatureCollection",
+    "crs": { 
+        "type": "name", 
+        "properties": { "name": "EPSG:3035" }
+      },
     features: []
   }
   for (i = 0; i < rows.length; i++) {
@@ -21,13 +25,12 @@ function toGeoJson(rows) {
         "coordinates": []
       }
     }
-    var x0 = rows[i].swx
-    var y0 = rows[i].swy
-    var coordinates = [[x0,y0]]
-    coordinates.push([x0+10,y0])
-    coordinates.push([x0,y0+10])
-    coordinates.push([x0+10,y0+10])
-
+    var x0 = parseInt(rows[i].swx)
+    var y0 = parseInt(rows[i].swy)
+    var coordinates = [[[x0,y0]]]
+    coordinates[0].push([x0+10,y0])
+    coordinates[0].push([x0+10,y0+10])
+    coordinates[0].push([x0,y0+10])
     feature.geometry.coordinates = coordinates
     obj.features.push(feature)
   }
