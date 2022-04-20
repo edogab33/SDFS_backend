@@ -52,13 +52,13 @@ const getGrid = async (req, res, next) => {
   var coords = [parseInt(req.params.x0), parseInt(req.params.xn), parseInt(req.params.y0), parseInt(req.params.yn)]
   pool.query("SELECT swx, swy FROM satellitemaps WHERE (swx >= "+coords[0]+" AND swx <= "+coords[1]+") "+
     "AND (swy >= "+coords[2]+" AND swy <= "+coords[3]+")", (error, result) => {
+      if (error) {
+        return res.status(500).send(error)
+      }
       data = result.rows
       grid = toGeoJson(data, false)
       res.header("Access-Control-Allow-Origin", "*");
-      res.status(200).json(grid)
-    })
-    .catch(e => {
-      res.status(500).send(e)
+      return res.status(200).json(grid)
     })
 }
 
@@ -168,20 +168,20 @@ const startSimulation = async (req, res) => {
 
 const getCoords = (request, response) => {
   pool.query("SELECT swx, swy FROM satellitemaps", (error, result) => {
+    if (error) {
+      return res.status(500).send(error)
+    }
     console.log(result)
     return response.status(200).json(result.rows)
-  })
-  .catch(e => {
-    return response.status(500).send(e)
   })
 }
 
 const getRequests = (request, response) => {
   pool.query("SELECT * FROM requests", (error, result) => {
+    if (error) {
+      return res.status(500).send(error)
+    }
     response.status(200).json(result.rows)
-  })
-  .catch(e => {
-    response.status(500).send(e)
   })
 }
 
