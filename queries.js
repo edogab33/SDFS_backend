@@ -66,16 +66,24 @@ const getGrid = async (req, res, next) => {
 
 const startSimulation = async (req, res) => {
   var jsonInitState = req.body
-  console.log(jsonInitState)
+  console.log(jsonInitState.features)
   var simulationId = crypto.randomInt(1000000)
-  var swx = jsonInitState.features[Math.ceil(jsonInitState.features.length / 2)].geometry.coordinates[0][0][0]
-  var swy = jsonInitState.features[Math.ceil(jsonInitState.features.length / 2)].geometry.coordinates[0][0][1]
+  var swx = jsonInitState.features[0].geometry.coordinates[0][0][0]   // south-west point of Area of Interest
+  var swy = jsonInitState.features[0].geometry.coordinates[0][0][1]
   var initialtime = Date.now()
 
-  // Randomize placename
-  var placename = crypto.randomBytes(10)
+  // xsize = xcoord_of_north-east_cell - xcoord_of_south-west_cell
+  var xsize = jsonInitState.features[jsonInitState.features.length - 1].geometry.coordinates[0][0][0] - swx
+  var ysize = jsonInitState.features[jsonInitState.features.length - 1].geometry.coordinates[0][0][1] - swy
+  console.log(jsonInitState.features[0].geometry.coordinates[0])
+  console.log(jsonInitState.features[jsonInitState.features.length - 1].geometry.coordinates[0])
+  console.log(xsize)
+  console.log(ysize)
 
-  // TODO: parametrize xsize and ysize
+  // Randomize placename
+  var placename = crypto.randomBytes(10).toString('hex')
+
+  // TODO: compute xsize and ysize
   var simulations_values = '('+simulationId+','+swx+','+swy+','+initialtime+','+placename+','+5+','+5+','+10+','+0.1+','+200+','+10+')'
   simulations_sql = 'INSERT INTO simulations (simulationid, swx, swy, initialtime, placename, xsize, ysize, cellsize, timestep, horizon, snapshottime) '+
     +simulations_values+';'
@@ -85,15 +93,16 @@ const startSimulation = async (req, res) => {
   })
   .catch(e => {
     res.status(500).send(e)
+    return
   })
 
   var initialstate_values = '('
   for (let i = 0; i < jsonInitState.features.length; i++) {
     if (i != 0) {
-      values += ', ('
+      initialstate_values += ', ('
     }
     initialstate_values += simulationId+','
-    initialstate_values += jsonInitState.features[i].geometry.coordinates[0][0][0]+','
+    initialstate_values += jsonInitState.features[i].geometry.coordinates[0][0][0]+','    // south-west coordinate of cell
     initialstate_values += jsonInitState.features[i].geometry.coordinates[0][0][1]+','
     initialstate_values += jsonInitState.features[i].properties.fire+')'
   }
@@ -104,14 +113,17 @@ const startSimulation = async (req, res) => {
   })
   .catch(e => {
     res.status(500).send(e)
+    return
   })
 
   pool.query(putRequest(simulationId, "start")).then((error, result) => {
     console.log(result)
     res.status(200).data(simulationId)
+    return
   })
   .catch(e => {
     res.status(500).send(e)
+    return
   })
 }
 
@@ -122,6 +134,7 @@ const getCoords = (request, response) => {
   })
   .catch(e => {
     res.status(500).send(e)
+    return
   })
 }
 
