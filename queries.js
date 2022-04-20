@@ -75,6 +75,16 @@ const getSnapshot = async (req, res) => {
   })
 }
 
+const stopSimulation = async (req, res) => {
+  var simulationId = req.params.id
+  pool.query(putRequest(simulationId, "stop"), (error, result) => {
+    if (error) {
+      return res.status(500).send(error)
+    }
+    return res.status(200)
+  })
+}
+
 const startSimulation = async (req, res) => {
   var jsonInitState = req.body
   console.log(jsonInitState.features)
@@ -187,7 +197,6 @@ const getRequests = (request, response) => {
 
 function putRequest(simulationId, simcmd) {
   // simcmd should be either "start" or "stop"
-  // returns a Pool.query object
   sql_query = "INSER INTO requests (simulationid, simcmd) VALUES "+simulationId+","+simcmd+";"
   return sql_query
 }
@@ -197,5 +206,6 @@ module.exports = {
   getGrid,
   getCoords,
   getSnapshot,
-  startSimulation
+  startSimulation,
+  stopSimulation
 }
