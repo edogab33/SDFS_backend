@@ -2,6 +2,7 @@ const express = require('express')
 const bodyParser = require('body-parser')
 const { json } = require('body-parser')
 const { response } = require('express')
+var crypto = require("crypto");
 const Pool = require('pg').Pool
 const pool = new Pool({
   user: 'postgres',
@@ -66,13 +67,16 @@ const getGrid = async (req, res, next) => {
 const startSimulation = async (req, res) => {
   var jsonInitState = req.body
   console.log(jsonInitState)
-  var simulationId = Math.floor(Math.random() * 100000000)
+  var simulationId = crypto.randomInt(1000000)
   var swx = jsonInitState.features[Math.ceil(jsonInitState.features.length / 2)].geometry.coordinates[0][0][0]
   var swy = jsonInitState.features[Math.ceil(jsonInitState.features.length / 2)].geometry.coordinates[0][0][1]
   var initialtime = Date.now()
 
+  // Randomize placename
+  var placename = crypto.randomBytes(10)
+
   // TODO: parametrize xsize and ysize
-  var simulations_values = '('+simulationId+','+swx+','+swy+','+initialtime+',Test'+','+5+','+5+','+10+','+0.1+','+200+','+10+')'
+  var simulations_values = '('+simulationId+','+swx+','+swy+','+initialtime+','+placename+','+5+','+5+','+10+','+0.1+','+200+','+10+')'
   simulations_sql = 'INSERT INTO simulations (simulationid, swx, swy, initialtime, placename, xsize, ysize, cellsize, timestep, horizon, snapshottime) '+
     +simulations_values+';'
 
