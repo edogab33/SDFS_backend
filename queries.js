@@ -1,14 +1,12 @@
-const express = require('express')
-const bodyParser = require('body-parser')
-const { json } = require('body-parser')
-const { response } = require('express')
+const express = require("express")
+const bodyParser = require("body-parser")
 var crypto = require("crypto");
-const Pool = require('pg').Pool
+const Pool = require("pg").Pool
 const pool = new Pool({
-  user: 'postgres',
-  host: 'localhost',
-  database: 'sdfs',
-  password: '',
+  user: "postgres",
+  host: "localhost",
+  database: "sdfs",
+  password: "",
   port: 5432,
 })
 const app = express()
@@ -20,7 +18,7 @@ app.use(
 )
 app.use(bodyParser.json())
 
-function toGeoJson(rows) {
+function toGeoJson(rows, isSnapshot) {
   var obj = {
     type: "FeatureCollection",
     "crs": { 
@@ -32,7 +30,7 @@ function toGeoJson(rows) {
   for (i = 0; i < rows.length; i++) {
     var feature = {
       "type": "Feature",
-      "properties": {"id": i, "fire": 0},
+      "properties": {"id": i, "fire": (isSnapshot ? rows[i].fire : 0)},
       "geometry":{
         "type": "Polygon",
         "coordinates": []
@@ -52,10 +50,10 @@ function toGeoJson(rows) {
 
 const getGrid = async (req, res, next) => {
   var coords = [parseInt(req.params.x0), parseInt(req.params.xn), parseInt(req.params.y0), parseInt(req.params.yn)]
-  pool.query('SELECT swx, swy FROM satellitemaps WHERE (swx >= '+coords[0]+' AND swx <= '+coords[1]+') '+
-    'AND (swy >= '+coords[2]+' AND swy <= '+coords[3]+')', (error, result) => {
+  pool.query("SELECT swx, swy FROM satellitemaps WHERE (swx >= "+coords[0]+" AND swx <= "+coords[1]+") "+
+    "AND (swy >= "+coords[2]+" AND swy <= "+coords[3]+")", (error, result) => {
       data = result.rows
-      grid = toGeoJson(data)
+      grid = toGeoJson(data, false)
       res.header("Access-Control-Allow-Origin", "*");
       res.status(200).json(grid)
     })
@@ -64,14 +62,32 @@ const getGrid = async (req, res, next) => {
     })
 }
 
+const getSnapshot = async (req, res) => {
+  var simulationId = req.params.id
+  pool.query("SELECT swx, swy, fire FROM simulatorsnapshots WHERE simulationid = "+simulationId, (error, result) => {
+    if (error) {
+      return res.status(500).send(error)
+    }
+    data = result.rows
+    grid = toGeoJson(data, true)
+    res.header("Access-Control-Allow-Origin", "*");
+    return res.status(200).json(grid)
+  })
+}
+
 const startSimulation = async (req, res) => {
   var jsonInitState = req.body
   console.log(jsonInitState.features)
   var simulationId = crypto.randomInt(1000000)
   var swx = jsonInitState.features[0].geometry.coordinates[0][0][0]   // south-west point of Area of Interest
   var swy = jsonInitState.features[0].geometry.coordinates[0][0][1]
-  var initialtime = Date.now()
-
+  var d = new Date
+  var initialtime = [d.getMonth()+1,
+             d.getDate(),
+             d.getFullYear()].join("-")+" "+
+            [d.getHours(),
+             d.getMinutes(),
+             d.getSeconds()].join(":");
   // xsize = xcoord_of_north-east_cell - xcoord_of_south-west_cell
   var xsize = jsonInitState.features[jsonInitState.features.length - 1].geometry.coordinates[0][0][0] - swx
   var ysize = jsonInitState.features[jsonInitState.features.length - 1].geometry.coordinates[0][0][1] - swy
@@ -81,84 +97,105 @@ const startSimulation = async (req, res) => {
   console.log(ysize)
 
   // Randomize placename
-  var placename = crypto.randomBytes(10).toString('hex')
-
-  // TODO: compute xsize and ysize
-  var simulations_values = '('+simulationId+','+swx+','+swy+','+initialtime+','+placename+','+5+','+5+','+10+','+0.1+','+200+','+10+')'
-  simulations_sql = 'INSERT INTO simulations (simulationid, swx, swy, initialtime, placename, xsize, ysize, cellsize, timestep, horizon, snapshottime) '+
-    +simulations_values+';'
-
-  pool.query(simulations_sql).then((error, result) => {
-    console.log(result)
-  })
-  .catch(e => {
-    res.status(500).send(e)
-    return
-  })
-
-  var initialstate_values = '('
-  for (let i = 0; i < jsonInitState.features.length; i++) {
-    if (i != 0) {
-      initialstate_values += ', ('
+  var placename = crypto.randomBytes(10).toString("hex")
+  
+  pool.connect((err, client, done) => {
+    const shouldAbort = err => {
+      if (err) {
+        console.error('Error in transaction', err.stack)
+        client.query('ROLLBACK', err => {
+          if (err) {
+            console.error('Error rolling back client', err.stack)
+          }
+          // release the client back to the pool
+          done()
+        })
+      }
+      return !!err
     }
-    initialstate_values += simulationId+','
-    initialstate_values += jsonInitState.features[i].geometry.coordinates[0][0][0]+','    // south-west coordinate of cell
-    initialstate_values += jsonInitState.features[i].geometry.coordinates[0][0][1]+','
-    initialstate_values += jsonInitState.features[i].properties.fire+')'
-  }
-  initialstate_sql= 'INSERT INTO initialstate (simulationid, swx, swy, fire) VALUES '+initialstate_values+';'
 
-  pool.query(initialstate_sql).then((error, result) => {
-    console.log(result)
-  })
-  .catch(e => {
-    res.status(500).send(e)
-    return
-  })
+    var simulations_values = "("+simulationId+", "+swx+", "+swy+", '"+initialtime+"', '"+placename+"', "+5+", "+5+", "+10+", "+0.1+", "+200+", "+10+")"
+    simulations_sql = "INSERT INTO simulations (simulationid, swx, swy, initialtime, placename, xsize, ysize, cellsize, timestep, horizon, snapshottime) VALUES "
+      +simulations_values+";"
+    
+    // Begin transaction
+    client.query("BEGIN", error => {
+      if (shouldAbort(error)) {
+        return res.status(500).send(error)
+      }
+      
+      client.query(simulations_sql, (error, result) => {
+        if (shouldAbort(error)) {
+          return res.status(500).send(error)
+        }
 
-  pool.query(putRequest(simulationId, "start")).then((error, result) => {
-    console.log(result)
-    res.status(200).data(simulationId)
-    return
-  })
-  .catch(e => {
-    res.status(500).send(e)
-    return
+        var initialstate_values = "("
+        for (let i = 0; i < jsonInitState.features.length; i++) {
+          if (i != 0) {
+            initialstate_values += ", ("
+          }
+          initialstate_values += simulationId+","
+          initialstate_values += jsonInitState.features[i].geometry.coordinates[0][0][0]+","    // south-west coordinate of cell
+          initialstate_values += jsonInitState.features[i].geometry.coordinates[0][0][1]+","
+          initialstate_values += jsonInitState.features[i].properties.fire+")"
+        }
+        initialstate_sql= "INSERT INTO initialstate (simulationid, swx, swy, fire) VALUES "+initialstate_values+";"
+        console.log(initialstate_sql)
+        client.query(initialstate_sql, (error, result) => {
+          if (shouldAbort(error)) {
+            return res.status(500).send(error)
+          }
+
+          client.query(putRequest(simulationId, "start"), (error, result) => {
+            if (abort(error)) {
+              return res.status(500).send(error)
+            }
+            console.log("query3: "+result)
+
+            client.query("COMMIT", error => {
+              if (shouldAbort(error)) {
+                return res.status(500).send(error)
+              }
+              done()
+              return res.status(200).json(simulationId)
+            })
+          })
+        })
+      })
+    })
   })
 }
 
 const getCoords = (request, response) => {
-  pool.query('SELECT swx, swy FROM satellitemaps', (error, result) => {
+  pool.query("SELECT swx, swy FROM satellitemaps", (error, result) => {
     console.log(result)
-    response.status(200).json(result.rows)
+    return response.status(200).json(result.rows)
   })
   .catch(e => {
-    res.status(500).send(e)
-    return
+    return response.status(500).send(e)
   })
 }
 
 const getRequests = (request, response) => {
-  pool.query('SELECT * FROM requests', (error, result) => {
+  pool.query("SELECT * FROM requests", (error, result) => {
     response.status(200).json(result.rows)
   })
   .catch(e => {
-    res.status(500).send(e)
+    response.status(500).send(e)
   })
 }
 
 function putRequest(simulationId, simcmd) {
   // simcmd should be either "start" or "stop"
   // returns a Pool.query object
-  sql_query = 'INSER INTO requests (simulationid, simcmd) VALUES '+simulationId+','+simcmd+';'
+  sql_query = "INSER INTO requests (simulationid, simcmd) VALUES "+simulationId+","+simcmd+";"
   return sql_query
 }
-
-function getSimulatorSnapshot(simulationId) {}
 
 module.exports = {
   getRequests,
   getGrid,
   getCoords,
+  getSnapshot,
   startSimulation
 }
