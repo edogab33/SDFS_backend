@@ -1,5 +1,6 @@
 const express = require("express")
 const bodyParser = require("body-parser")
+const sortArray = require('sort-array')
 var crypto = require("crypto");
 const Pool = require("pg").Pool
 const pool = new Pool({
@@ -64,7 +65,8 @@ const getGrid = async (req, res, next) => {
 
 const getSnapshot = async (req, res) => {
   var simulationId = req.params.id
-  pool.query("SELECT swx, swy, fire FROM simulatorsnapshots WHERE simulationid = "+simulationId, (error, result) => {
+  pool.query("SELECT swx, swy, fire FROM simulatorsnapshots WHERE simulationid = 1", (error, result) => {
+  //pool.query("SELECT swx, swy, fire FROM simulatorsnapshots WHERE simulationid = "+simulationId, (error, result) => {
     if (error) {
       return res.status(500).send(error)
     }
@@ -88,6 +90,13 @@ const stopSimulation = async (req, res) => {
 
 const startSimulation = async (req, res) => {
   var jsonInitState = req.body
+  //jsonInitState.features.sort(function(a,b) { return a.properties.id > b.properties.id })
+  sortArray(jsonInitState.features, {
+    by: 'id',
+    computed: {
+      id: row => row.properties.id
+    }
+  })
   console.log(jsonInitState.features)
   var simulationId = crypto.randomInt(1000000)
   var swx = jsonInitState.features[0].geometry.coordinates[0][0][0]   // south-west point of Area of Interest
