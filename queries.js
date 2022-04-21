@@ -151,17 +151,15 @@ const startSimulation = async (req, res) => {
           initialstate_values += jsonInitState.features[i].properties.fire+")"
         }
         initialstate_sql= "INSERT INTO initialstate (simulationid, swx, swy, fire) VALUES "+initialstate_values+";"
-        console.log(initialstate_sql)
         client.query(initialstate_sql, (error, result) => {
           if (shouldAbort(error)) {
             return res.status(500).send(error)
           }
 
           client.query(putRequest(simulationId, "start"), (error, result) => {
-            if (abort(error)) {
+            if (shouldAbort(error)) {
               return res.status(500).send(error)
             }
-            console.log("query3: "+result)
 
             client.query("COMMIT", error => {
               if (shouldAbort(error)) {

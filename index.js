@@ -6,18 +6,33 @@ const db = require('./queries')
 const app = express()
 const port = 4000
 
-var corsOptions = {
-    origin: 'http://localhost:4200',
-    optionsSuccessStatus: 200
-}
+//var corsOptions = {
+//    origin: 'http://localhost:3000',
+//    optionsSuccessStatus: 200
+//}
 
-app.use(cors(corsOptions))
+//app.use(cors(corsOptions))
 app.use(bodyParser.json())
 app.use(
   bodyParser.urlencoded({
     extended: true,
   })
 )
+
+app.use(function (req, res, next) {
+
+    // Website you wish to allow to connect
+    res.setHeader('Access-Control-Allow-Origin', '*');
+
+    // Request methods you wish to allow
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, PUT, PATCH, DELETE');
+
+    // Request headers you wish to allow
+    res.setHeader('Access-Control-Allow-Headers', 'X-Requested-With,content-type');
+
+    // Pass to next layer of middleware
+    next();
+});
 
 app.get('/', (request, response) => {
     response.header("Access-Control-Allow-Origin", "*");
