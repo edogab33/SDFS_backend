@@ -84,7 +84,7 @@ const stopSimulation = async (req, res) => {
       console.error(error)
       return res.status(500).send(error)
     }
-    return res.status(200)
+    return res.status(200).send("Simulation stopped")
   })
 }
 
