@@ -19,36 +19,6 @@ app.use(
 )
 app.use(bodyParser.json())
 
-function toGeoJson(rows, isSnapshot) {
-  var obj = {
-    type: "FeatureCollection",
-    "crs": { 
-        "type": "name", 
-        "properties": { "name": "EPSG:3035" }
-      },
-    features: []
-  }
-  for (i = 0; i < rows.length; i++) {
-    var feature = {
-      "type": "Feature",
-      "properties": {"id": i, "fire": (isSnapshot ? rows[i].fire : 0)},
-      "geometry":{
-        "type": "Polygon",
-        "coordinates": []
-      }
-    }
-    var x0 = parseInt(rows[i].swx)
-    var y0 = parseInt(rows[i].swy)
-    var coordinates = [[[x0,y0]]]
-    coordinates[0].push([x0+10,y0])
-    coordinates[0].push([x0+10,y0+10])
-    coordinates[0].push([x0,y0+10])
-    feature.geometry.coordinates = coordinates
-    obj.features.push(feature)
-  }
-  return obj
-} 
-
 const getGrid = async (req, res, next) => {
   var coords = [parseInt(req.params.x0), parseInt(req.params.xn), parseInt(req.params.y0), parseInt(req.params.yn)]
   pool.query("SELECT swx, swy FROM satellitemaps WHERE (swx >= "+coords[0]+" AND swx <= "+coords[1]+") "+
@@ -65,8 +35,8 @@ const getGrid = async (req, res, next) => {
 
 const getSnapshot = async (req, res) => {
   var simulationId = req.params.id
-  pool.query("SELECT swx, swy, fire FROM simulatorsnapshots WHERE simulationid = 1", (error, result) => {
-  //pool.query("SELECT swx, swy, fire FROM simulatorsnapshots WHERE simulationid = "+simulationId, (error, result) => {
+  pool.query("SELECT swx, swy, fire, elapsedtime FROM simulatorsnapshots WHERE simulationid = 1", (error, result) => {
+  //pool.query("SELECT swx, swy, fire, elapsedtime FROM simulatorsnapshots WHERE simulationid = "+simulationId, (error, result) => {
     if (error) {
       return res.status(500).send(error)
     }
@@ -90,14 +60,13 @@ const stopSimulation = async (req, res) => {
 
 const startSimulation = async (req, res) => {
   var jsonInitState = req.body
-  //jsonInitState.features.sort(function(a,b) { return a.properties.id > b.properties.id })
   sortArray(jsonInitState.features, {
     by: 'id',
     computed: {
       id: row => row.properties.id
     }
   })
-  console.log(jsonInitState.features)
+
   var simulationId = crypto.randomInt(1000000)
   var swx = jsonInitState.features[0].geometry.coordinates[0][0][0]   // south-west point of Area of Interest
   var swy = jsonInitState.features[0].geometry.coordinates[0][0][1]
@@ -111,12 +80,6 @@ const startSimulation = async (req, res) => {
   // xsize = xcoord_of_north-east_cell - xcoord_of_south-west_cell
   var xsize = jsonInitState.features[jsonInitState.features.length - 1].geometry.coordinates[0][0][0] - swx
   var ysize = jsonInitState.features[jsonInitState.features.length - 1].geometry.coordinates[0][0][1] - swy
-  console.log(jsonInitState.features[0].geometry.coordinates[0])
-  console.log(jsonInitState.features[jsonInitState.features.length - 1].geometry.coordinates[0])
-  console.log(xsize)
-  console.log(ysize)
-
-  // Randomize placename
   var placename = crypto.randomBytes(10).toString("hex")
   
   pool.connect((err, client, done) => {
@@ -143,39 +106,49 @@ const startSimulation = async (req, res) => {
       if (shouldAbort(error)) {
         return res.status(500).send(error)
       }
-      
-      client.query(simulations_sql, (error, result) => {
+
+      client.query("DELETE * FROM requests", (error, result) => {
         if (shouldAbort(error)) {
           return res.status(500).send(error)
         }
-
-        var initialstate_values = "("
-        for (let i = 0; i < jsonInitState.features.length; i++) {
-          if (i != 0) {
-            initialstate_values += ", ("
-          }
-          initialstate_values += simulationId+","
-          initialstate_values += jsonInitState.features[i].geometry.coordinates[0][0][0]+","    // south-west coordinate of cell
-          initialstate_values += jsonInitState.features[i].geometry.coordinates[0][0][1]+","
-          initialstate_values += jsonInitState.features[i].properties.fire+")"
-        }
-        initialstate_sql= "INSERT INTO initialstate (simulationid, swx, swy, fire) VALUES "+initialstate_values+";"
-        client.query(initialstate_sql, (error, result) => {
+        client.query("DELETE * FROM initialstate", (error, result) => {
           if (shouldAbort(error)) {
             return res.status(500).send(error)
           }
-
-          client.query(putRequest(simulationId, "start"), (error, result) => {
+          client.query(simulations_sql, (error, result) => {
             if (shouldAbort(error)) {
               return res.status(500).send(error)
             }
 
-            client.query("COMMIT", error => {
+            var initialstate_values = "("
+            for (let i = 0; i < jsonInitState.features.length; i++) {
+              if (i != 0) {
+                initialstate_values += ", ("
+              }
+              initialstate_values += simulationId+","+
+                                    jsonInitState.features[i].geometry.coordinates[0][0][0]+","+
+                                    jsonInitState.features[i].geometry.coordinates[0][0][1]+","+
+                                    jsonInitState.features[i].properties.fire+")"
+            }
+            initialstate_sql = "INSERT INTO initialstate (simulationid, swx, swy, fire) VALUES "+initialstate_values+";"
+            client.query(initialstate_sql, (error, result) => {
               if (shouldAbort(error)) {
                 return res.status(500).send(error)
               }
-              done()
-              return res.status(200).json(simulationId)
+
+              client.query(putRequest(simulationId, "start"), (error, result) => {
+                if (shouldAbort(error)) {
+                  return res.status(500).send(error)
+                }
+
+                client.query("COMMIT", error => {
+                  if (shouldAbort(error)) {
+                    return res.status(500).send(error)
+                  }
+                  done()
+                  return res.status(200).json(simulationId)
+                })
+              })
             })
           })
         })
@@ -208,6 +181,36 @@ function putRequest(simulationId, simcmd) {
   sql_query = "INSERT INTO requests (simulationid, simcmd) VALUES ("+simulationId+",'"+simcmd+"');"
   return sql_query
 }
+
+function toGeoJson(rows, isSnapshot) {
+  var obj = {
+    type: "FeatureCollection",
+    "crs": { 
+        "type": "name", 
+        "properties": { "name": "EPSG:3035" }
+      },
+    features: []
+  }
+  for (i = 0; i < rows.length; i++) {
+    var feature = {
+      "type": "Feature",
+      "properties": {"id": i, "fire": (isSnapshot ? rows[i].fire : 0), "elapsedtime": rows[i].elapsedtime},
+      "geometry":{
+        "type": "Polygon",
+        "coordinates": []
+      }
+    }
+    var x0 = parseInt(rows[i].swx)
+    var y0 = parseInt(rows[i].swy)
+    var coordinates = [[[x0,y0]]]
+    coordinates[0].push([x0+10,y0])
+    coordinates[0].push([x0+10,y0+10])
+    coordinates[0].push([x0,y0+10])
+    feature.geometry.coordinates = coordinates
+    obj.features.push(feature)
+  }
+  return obj
+} 
 
 module.exports = {
   getRequests,
