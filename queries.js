@@ -35,8 +35,7 @@ const getGrid = async (req, res, next) => {
 
 const getSnapshot = async (req, res) => {
   var simulationId = req.params.id
-  pool.query("SELECT swx, swy, fire, elapsedtime FROM simulatorsnapshots WHERE simulationid = 1", (error, result) => {
-  //pool.query("SELECT swx, swy, fire, elapsedtime FROM simulatorsnapshots WHERE simulationid = "+simulationId, (error, result) => {
+  pool.query("SELECT swx, swy, fire, elapsedminutes FROM simulatorsnapshots WHERE simulationid = "+simulationId, (error, result) => {
     if (error) {
       return res.status(500).send(error)
     }
@@ -81,6 +80,9 @@ const startSimulation = async (req, res) => {
   var xsize = jsonInitState.features[jsonInitState.features.length - 1].geometry.coordinates[0][0][0] - swx
   var ysize = jsonInitState.features[jsonInitState.features.length - 1].geometry.coordinates[0][0][1] - swy
   var placename = crypto.randomBytes(10).toString("hex")
+
+  console.log(xsize)
+  console.log(ysize)
   
   pool.connect((err, client, done) => {
     const shouldAbort = err => {
@@ -97,8 +99,8 @@ const startSimulation = async (req, res) => {
       return !!err
     }
 
-    var simulations_values = "("+simulationId+", "+swx+", "+swy+", '"+initialtime+"', '"+placename+"', "+5+", "+5+", "+10+", "+0.1+", "+200+", "+10+")"
-    simulations_sql = "INSERT INTO simulations (simulationid, swx, swy, initialtime, placename, xsize, ysize, cellsize, timestep, horizon, snapshottime) VALUES "
+    var simulations_values = "("+simulationId+", "+swx+", "+swy+", '"+initialtime+"', '"+placename+"', "+xsize+", "+ysize+", "+10+", "+0.1+", "+200+", "+10+")"
+      simulations_sql = "INSERT INTO simulations (simulationid, swx, swy, initialtime, placename, xsize, ysize, cellsize, timestep, horizon, snapshottime) VALUES "
       +simulations_values+";"
     
     // Begin transaction
@@ -107,11 +109,11 @@ const startSimulation = async (req, res) => {
         return res.status(500).send(error)
       }
 
-      client.query("DELETE * FROM requests", (error, result) => {
+      client.query("DELETE FROM requests", (error, result) => {
         if (shouldAbort(error)) {
           return res.status(500).send(error)
         }
-        client.query("DELETE * FROM initialstate", (error, result) => {
+        client.query("DELETE FROM initialstate", (error, result) => {
           if (shouldAbort(error)) {
             return res.status(500).send(error)
           }
@@ -194,7 +196,7 @@ function toGeoJson(rows, isSnapshot) {
   for (i = 0; i < rows.length; i++) {
     var feature = {
       "type": "Feature",
-      "properties": {"id": i, "fire": (isSnapshot ? rows[i].fire : 0), "elapsedtime": rows[i].elapsedtime},
+      "properties": {"id": i, "fire": (isSnapshot ? rows[i].fire : 0), "elapsedminutes": rows[i].elapsedminutes},
       "geometry":{
         "type": "Polygon",
         "coordinates": []
