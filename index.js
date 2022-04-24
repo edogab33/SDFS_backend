@@ -12,11 +12,11 @@ const port = 4000
 //}
 
 //app.use(cors(corsOptions))
-app.use(bodyParser.json({limit: '80mb'}))
+app.use(bodyParser.json({limit: '180mb'}))
 app.use(
   bodyParser.urlencoded({
     extended: true,
-    limit: '80mb'
+    limit: '180mb'
   })
 )
 

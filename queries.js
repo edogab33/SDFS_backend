@@ -27,9 +27,20 @@ const getGrid = async (req, res, next) => {
         return res.status(500).send(error)
       }
       data = result.rows
-      grid = toGeoJson(data, false)
-      res.header("Access-Control-Allow-Origin", "*");
-      return res.status(200).json(grid)
+      if (data.length > 0) {
+        grid = toGeoJson(data, false)
+        return res.status(200).json(grid)
+      } else {
+        pool.query("SELECT swx, swy FROM satellitemaps WHERE (swx >= "+coords[1]+" AND swx <= "+coords[0]+") "+
+          "AND (swy >= "+coords[3]+" AND swy <= "+coords[2]+")", (error, result) => {
+            if (error) {
+              return res.status(500).send(error)
+            }
+            data = result.rows
+            grid = toGeoJson(data, false)
+            return res.status(200).json(grid)
+          })
+      }
     })
 }
 
