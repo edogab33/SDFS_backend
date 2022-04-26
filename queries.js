@@ -4,10 +4,10 @@ const sortArray = require('sort-array')
 var crypto = require("crypto");
 const Pool = require("pg").Pool
 const pool = new Pool({
-  user: "postgres",
+  user: "sdfs",
   host: "localhost",
   database: "sdfs",
-  password: "",
+  password: "123456",
   port: 5432,
 })
 const app = express()
@@ -21,20 +21,22 @@ app.use(bodyParser.json())
 
 const getGrid = async (req, res, next) => {
   var coords = [parseInt(req.params.x0), parseInt(req.params.xn), parseInt(req.params.y0), parseInt(req.params.yn)]
-  pool.query("SELECT swx, swy FROM satellitemaps WHERE (swx >= "+coords[0]+" AND swx <= "+coords[1]+") "+
+  pool.query("SELECT swx, swy FROM cartanatura WHERE (swx >= "+coords[0]+" AND swx <= "+coords[1]+") "+
     "AND (swy >= "+coords[2]+" AND swy <= "+coords[3]+")", (error, result) => {
       if (error) {
-        return res.status(500).send(error)
+        console.error(error)
+        return res.status(500).json(error)
       }
       data = result.rows
       if (data.length > 0) {
         grid = toGeoJson(data, false)
         return res.status(200).json(grid)
       } else {
-        pool.query("SELECT swx, swy FROM satellitemaps WHERE (swx >= "+coords[1]+" AND swx <= "+coords[0]+") "+
+        pool.query("SELECT swx, swy FROM cartanatura WHERE (swx >= "+coords[1]+" AND swx <= "+coords[0]+") "+
           "AND (swy >= "+coords[3]+" AND swy <= "+coords[2]+")", (error, result) => {
             if (error) {
-              return res.status(500).send(error)
+              console.error(error)
+              return res.status(500).json(error)
             }
             data = result.rows
             grid = toGeoJson(data, false)
@@ -46,8 +48,11 @@ const getGrid = async (req, res, next) => {
 
 const getSnapshot = async (req, res) => {
   var simulationId = req.params.id
-  pool.query("SELECT swx, swy, fire, elapsedminutes FROM simulatorsnapshots WHERE simulationid = "+simulationId, (error, result) => {
+  var query = "SELECT swx, swy, fire, elapsedminutes FROM simulatorsnapshots WHERE (simulationid = "+simulationId+") AND "+
+            + "elapsedminutes = (SELECT MAX(elapsedminutes) FROM simulatorsnapshots);"
+  pool.query(query, (error, result) => {
     if (error) {
+      console.error(error)
       return res.status(500).send(error)
     }
     data = result.rows
@@ -81,15 +86,16 @@ const startSimulation = async (req, res) => {
   var swx = jsonInitState.features[0].geometry.coordinates[0][0][0]   // south-west point of Area of Interest
   var swy = jsonInitState.features[0].geometry.coordinates[0][0][1]
   var d = new Date
-  var initialtime = [d.getMonth()+1,
-             d.getDate(),
-             d.getFullYear()].join("-")+" "+
+  var initialtime = [d.getFullYear(),
+             d.getMonth()+1,
+             d.getDate()].join("-")+" "+
             [d.getHours(),
              d.getMinutes(),
              d.getSeconds()].join(":");
+  console.log(initialtime)
   // xsize = xcoord_of_north-east_cell - xcoord_of_south-west_cell
-  var xsize = jsonInitState.features[jsonInitState.features.length - 1].geometry.coordinates[0][0][0] - swx
-  var ysize = jsonInitState.features[jsonInitState.features.length - 1].geometry.coordinates[0][0][1] - swy
+  var xsize = Math.floor((jsonInitState.features[jsonInitState.features.length - 1].geometry.coordinates[0][0][0] - swx) / 10) + 1
+  var ysize = Math.floor((jsonInitState.features[jsonInitState.features.length - 1].geometry.coordinates[0][0][1] - swy) / 10) + 1
   var placename = crypto.randomBytes(10).toString("hex")
 
   console.log(xsize)
@@ -111,51 +117,64 @@ const startSimulation = async (req, res) => {
     }
 
     var simulations_values = "("+simulationId+", "+swx+", "+swy+", '"+initialtime+"', '"+placename+"', "+xsize+", "+ysize+", "+10+", "+0.1+", "+200+", "+10+")"
-      simulations_sql = "INSERT INTO simulations (simulationid, swx, swy, initialtime, placename, xsize, ysize, cellsize, timestep, horizon, snapshottime) VALUES "
+    var simulations_sql = "INSERT INTO simulations (simulationid, swx, swy, initialtime, placename, xsize, ysize, cellsize, timestep, horizon, snapshottime) VALUES "
       +simulations_values+";"
     
+    console.log(simulations_sql)
+
+    var initialstate_values = "("
+    for (let i = 0; i < jsonInitState.features.length; i++) {
+      if (i != 0) {
+        initialstate_values += ", ("
+      }
+      initialstate_values += simulationId+","+
+                            jsonInitState.features[i].geometry.coordinates[0][0][0]+","+
+                            jsonInitState.features[i].geometry.coordinates[0][0][1]+","+
+                            jsonInitState.features[i].properties.fire+")"
+    }
+    initialstate_sql = "INSERT INTO initialstate (simulationid, swx, swy, fire) VALUES "+initialstate_values+";"
+    console.log(initialstate_sql)
+
     // Begin transaction
     client.query("BEGIN", error => {
       if (shouldAbort(error)) {
+        console.log(error)
         return res.status(500).send(error)
       }
 
       client.query("DELETE FROM requests", (error, result) => {
         if (shouldAbort(error)) {
+          console.log(error)
           return res.status(500).send(error)
         }
+
         client.query("DELETE FROM initialstate", (error, result) => {
           if (shouldAbort(error)) {
+            console.log(error)
             return res.status(500).send(error)
           }
+
           client.query(simulations_sql, (error, result) => {
             if (shouldAbort(error)) {
+              console.log(error)
               return res.status(500).send(error)
             }
 
-            var initialstate_values = "("
-            for (let i = 0; i < jsonInitState.features.length; i++) {
-              if (i != 0) {
-                initialstate_values += ", ("
-              }
-              initialstate_values += simulationId+","+
-                                    jsonInitState.features[i].geometry.coordinates[0][0][0]+","+
-                                    jsonInitState.features[i].geometry.coordinates[0][0][1]+","+
-                                    jsonInitState.features[i].properties.fire+")"
-            }
-            initialstate_sql = "INSERT INTO initialstate (simulationid, swx, swy, fire) VALUES "+initialstate_values+";"
             client.query(initialstate_sql, (error, result) => {
               if (shouldAbort(error)) {
+                console.log(error)
                 return res.status(500).send(error)
               }
 
               client.query(putRequest(simulationId, "start"), (error, result) => {
                 if (shouldAbort(error)) {
+                  console.log(error)
                   return res.status(500).send(error)
                 }
 
                 client.query("COMMIT", error => {
                   if (shouldAbort(error)) {
+                    console.log(error)
                     return res.status(500).send(error)
                   }
                   done()

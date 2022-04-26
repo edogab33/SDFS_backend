@@ -2,6 +2,7 @@ const express = require('express')
 const bodyParser = require('body-parser')
 const cors = require('cors');
 const db = require('./queries')
+const path = require('path')
 
 const app = express()
 const port = 4000
@@ -12,6 +13,7 @@ const port = 4000
 //}
 
 //app.use(cors(corsOptions))
+app.use(cors());
 app.use(bodyParser.json({limit: '180mb'}))
 app.use(
   bodyParser.urlencoded({
@@ -20,18 +22,13 @@ app.use(
   })
 )
 
+app.use(express.static(path.join(__dirname, "dist")))
+
 app.use(function (req, res, next) {
-
-    // Website you wish to allow to connect
     res.setHeader('Access-Control-Allow-Origin', '*');
-
-    // Request methods you wish to allow
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, PUT, PATCH, DELETE');
+    res.setHeader('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
 
-    // Request headers you wish to allow
-    res.setHeader('Access-Control-Allow-Headers', 'X-Requested-With,content-type');
-
-    // Pass to next layer of middleware
     next();
 });
 
