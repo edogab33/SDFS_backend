@@ -3,20 +3,33 @@ const bodyParser = require("body-parser")
 const sortArray = require('sort-array')
 var crypto = require("crypto");
 const Pool = require("pg").Pool
-//const pool = new Pool({
-//  user: "sdfs",
-//  host: "localhost",
-//  database: "sdfs",
-//  password: "123456",
-//  port: 5432,
-//})
-const pool = new Pool({
-  user: "postgres",
-  host: "localhost",
-  database: "sdfs",
-  password: "",
-  port: 5432,
-})
+
+const env = 'prod'
+var pool
+var maps
+
+if (env == 'local') {
+  pool = new Pool({
+    user: "postgres",
+    host: "localhost",
+    database: "sdfs",
+    password: "",
+    port: 5432,
+  })
+
+  maps = 'satellitemaps'
+} else {
+  pool = new Pool({
+    user: "sdfs",
+    host: "localhost",
+    database: "sdfs",
+    password: "123456",
+    port: 5432,
+  })
+
+  maps = 'cartanatura'
+}
+
 const app = express()
 app.use(bodyParser.json())
 app.use(
@@ -28,7 +41,7 @@ app.use(bodyParser.json())
 
 const getGrid = async (req, res, next) => {
   var coords = [parseInt(req.params.x0), parseInt(req.params.xn), parseInt(req.params.y0), parseInt(req.params.yn)]
-  pool.query("SELECT swx, swy FROM satellitemaps WHERE (swx >= "+coords[0]+" AND swx <= "+coords[1]+") "+
+  pool.query("SELECT swx, swy FROM "+maps+" WHERE (swx >= "+coords[0]+" AND swx <= "+coords[1]+") "+
     "AND (swy >= "+coords[2]+" AND swy <= "+coords[3]+")", (error, result) => {
       if (error) {
         console.error(error)
@@ -39,7 +52,7 @@ const getGrid = async (req, res, next) => {
         grid = toGeoJson(data, false)
         return res.status(200).json(grid)
       } else {
-        pool.query("SELECT swx, swy FROM satellitemaps WHERE (swx >= "+coords[1]+" AND swx <= "+coords[0]+") "+
+        pool.query("SELECT swx, swy FROM "+maps+" WHERE (swx >= "+coords[1]+" AND swx <= "+coords[0]+") "+
           "AND (swy >= "+coords[3]+" AND swy <= "+coords[2]+")", (error, result) => {
             if (error) {
               console.error(error)
