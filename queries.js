@@ -55,8 +55,9 @@ const getGrid = async (req, res, next) => {
 
 const getSnapshot = async (req, res) => {
   var simulationId = req.params.id
+  var elapsedminutes = req.params.elapsedminutes
   var query = "SELECT swx, swy, fire, elapsedminutes FROM simulatorsnapshots WHERE (simulationid = "+simulationId+") AND "
-            + "(elapsedminutes = (SELECT MAX(elapsedminutes) FROM simulatorsnapshots));"
+            + "(elapsedminutes <= "+elapsedminutes+");"
 
   pool.query(query, (error, result) => {
     if (error) {
