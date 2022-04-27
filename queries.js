@@ -3,11 +3,18 @@ const bodyParser = require("body-parser")
 const sortArray = require('sort-array')
 var crypto = require("crypto");
 const Pool = require("pg").Pool
+//const pool = new Pool({
+//  user: "sdfs",
+//  host: "localhost",
+//  database: "sdfs",
+//  password: "123456",
+//  port: 5432,
+//})
 const pool = new Pool({
-  user: "sdfs",
+  user: "postgres",
   host: "localhost",
   database: "sdfs",
-  password: "123456",
+  password: "",
   port: 5432,
 })
 const app = express()
@@ -21,7 +28,7 @@ app.use(bodyParser.json())
 
 const getGrid = async (req, res, next) => {
   var coords = [parseInt(req.params.x0), parseInt(req.params.xn), parseInt(req.params.y0), parseInt(req.params.yn)]
-  pool.query("SELECT swx, swy FROM cartanatura WHERE (swx >= "+coords[0]+" AND swx <= "+coords[1]+") "+
+  pool.query("SELECT swx, swy FROM satellitemaps WHERE (swx >= "+coords[0]+" AND swx <= "+coords[1]+") "+
     "AND (swy >= "+coords[2]+" AND swy <= "+coords[3]+")", (error, result) => {
       if (error) {
         console.error(error)
@@ -32,7 +39,7 @@ const getGrid = async (req, res, next) => {
         grid = toGeoJson(data, false)
         return res.status(200).json(grid)
       } else {
-        pool.query("SELECT swx, swy FROM cartanatura WHERE (swx >= "+coords[1]+" AND swx <= "+coords[0]+") "+
+        pool.query("SELECT swx, swy FROM satellitemaps WHERE (swx >= "+coords[1]+" AND swx <= "+coords[0]+") "+
           "AND (swy >= "+coords[3]+" AND swy <= "+coords[2]+")", (error, result) => {
             if (error) {
               console.error(error)
@@ -98,6 +105,7 @@ const startSimulation = async (req, res) => {
   var xsize = Math.floor((jsonInitState.features[jsonInitState.features.length - 1].geometry.coordinates[0][0][0] - swx) / 10) + 1
   var ysize = Math.floor((jsonInitState.features[jsonInitState.features.length - 1].geometry.coordinates[0][0][1] - swy) / 10) + 1
   var placename = crypto.randomBytes(10).toString("hex")
+  var horizon = jsonInitState.horizon
 
   console.log(xsize)
   console.log(ysize)
@@ -117,7 +125,7 @@ const startSimulation = async (req, res) => {
       return !!err
     }
 
-    var simulations_values = "("+simulationId+", "+swx+", "+swy+", '"+initialtime+"', '"+placename+"', "+xsize+", "+ysize+", "+10+", "+0.1+", "+200+", "+10+")"
+    var simulations_values = "("+simulationId+", "+swx+", "+swy+", '"+initialtime+"', '"+placename+"', "+xsize+", "+ysize+", "+10+", "+0.1+", "+horizon+", "+10+")"
     var simulations_sql = "INSERT INTO simulations (simulationid, swx, swy, initialtime, placename, xsize, ysize, cellsize, timestep, horizon, snapshottime) VALUES "
       +simulations_values+";"
     
