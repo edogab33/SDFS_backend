@@ -57,7 +57,7 @@ const getSnapshot = async (req, res) => {
   var simulationId = req.params.id
   var elapsedminutes = req.params.elapsedminutes
   var query = "SELECT swx, swy, fire, elapsedminutes FROM simulatorsnapshots WHERE (simulationid = "+simulationId+") AND "
-            + "(elapsedminutes <= "+elapsedminutes+");"
+            + "(elapsedminutes <= "+elapsedminutes+") AND (elapsedminutes > "+(elapsedminutes-10)+");"
 
   pool.query(query, (error, result) => {
     if (error) {
