@@ -5,7 +5,7 @@ const crypto = require("crypto");
 const Pool = require("pg").Pool
 const compression = require('compression')
 
-const env = 'prod'
+const env = 'local'
 var pool
 var maps
 
@@ -123,7 +123,17 @@ const startSimulation = async (req, res) => {
   var ysize = Math.floor((jsonInitState.features[jsonInitState.features.length - 1].geometry.coordinates[0][0][1] - swy) / 10) + 1
   var placename = crypto.randomBytes(10).toString("hex")
   var horizon = jsonInitState.horizon
+  
+  // Somethimes in production (with larger grids) the difference is negative, so the following code is needed to not insert invalid
+  // data into the database.
+  if (xsize < 0) {
+    var xsize = Math.floor((swx - jsonInitState.features[jsonInitState.features.length - 1].geometry.coordinates[0][0][0]) / 10) + 1
+  } else if (ysize < 0) {
+    var ysize = Math.floor(swy - (jsonInitState.features[jsonInitState.features.length - 1].geometry.coordinates[0][0][1]) / 10) + 1
+  }
 
+  console.log(swy)
+  console.log(jsonInitState.features[jsonInitState.features.length - 1].geometry.coordinates[0][0][1])
   console.log(xsize)
   console.log(ysize)
 
