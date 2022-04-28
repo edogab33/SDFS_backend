@@ -1,8 +1,9 @@
 const express = require("express")
 const bodyParser = require("body-parser")
 const sortArray = require('sort-array')
-var crypto = require("crypto");
+const crypto = require("crypto");
 const Pool = require("pg").Pool
+const compression = require('compression')
 
 const env = 'prod'
 var pool
@@ -31,6 +32,8 @@ if (env == 'local') {
 }
 
 const app = express()
+
+app.use(compression())
 app.use(bodyParser.json())
 app.use(
   bodyParser.urlencoded({
@@ -123,6 +126,12 @@ const startSimulation = async (req, res) => {
 
   console.log(xsize)
   console.log(ysize)
+
+  if (xsize < 0 || ysize < 0) {
+    let err = "Size of the grid is less then 0. This is probably caused by an internal server error."
+    console.error(err)
+    return res.status(500).send(err)
+  }
   
   pool.connect((err, client, done) => {
     const shouldAbort = err => {
