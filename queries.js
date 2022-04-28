@@ -104,7 +104,7 @@ const startSimulation = async (req, res) => {
     }
   })
 
-  var simulationId = crypto.randomInt(1000000)
+  var simulationId = Math.floor(100000000 + Math.random() * 900000000);   // 9 digits random id
   var swx = jsonInitState.features[0].geometry.coordinates[0][0][0]   // south-west point of Area of Interest
   var swy = jsonInitState.features[0].geometry.coordinates[0][0][1]
   var d = new Date
@@ -156,7 +156,6 @@ const startSimulation = async (req, res) => {
                             jsonInitState.features[i].properties.fire+")"
     }
     initialstate_sql = "INSERT INTO initialstate (simulationid, swx, swy, fire) VALUES "+initialstate_values+";"
-    console.log(initialstate_sql)
 
     // Begin transaction
     client.query("BEGIN", error => {
