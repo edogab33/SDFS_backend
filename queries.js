@@ -5,7 +5,7 @@ const crypto = require("crypto");
 const Pool = require("pg").Pool
 const compression = require('compression')
 
-const env = 'local'
+const env = 'prod'
 var pool
 var maps
 
@@ -72,8 +72,9 @@ const getGrid = async (req, res, next) => {
 const getSnapshot = async (req, res) => {
   var simulationId = req.params.id
   var elapsedminutes = req.params.elapsedminutes
+  var snapshottime = req.params.snapshottime
   var query = "SELECT swx, swy, fire, elapsedminutes FROM simulatorsnapshots WHERE (simulationid = "+simulationId+") AND "
-            + "(elapsedminutes <= "+elapsedminutes+") AND (elapsedminutes > "+(elapsedminutes-10)+");"
+            + "(elapsedminutes <= "+elapsedminutes+") AND (elapsedminutes > "+(elapsedminutes-snapshottime)+");"
 
   pool.query(query, (error, result) => {
     if (error) {
@@ -123,6 +124,7 @@ const startSimulation = async (req, res) => {
   var ysize = Math.floor((jsonInitState.features[jsonInitState.features.length - 1].geometry.coordinates[0][0][1] - swy) / 10) + 1
   var placename = crypto.randomBytes(10).toString("hex")
   var horizon = jsonInitState.horizon
+  var snapshottime = jsonInitState.snapshottime
   
   // Somethimes in production (with larger grids) the difference is negative, so the following code is needed to not insert invalid
   // data into the database.
@@ -156,7 +158,7 @@ const startSimulation = async (req, res) => {
       return !!err
     }
 
-    var simulations_values = "("+simulationId+", "+swx+", "+swy+", '"+initialtime+"', '"+placename+"', "+xsize+", "+ysize+", "+10+", "+0.1+", "+horizon+", "+10+")"
+    var simulations_values = "("+simulationId+", "+swx+", "+swy+", '"+initialtime+"', '"+placename+"', "+xsize+", "+ysize+", "+10+", "+0.1+", "+horizon+", "+snapshottime+")"
     var simulations_sql = "INSERT INTO simulations (simulationid, swx, swy, initialtime, placename, xsize, ysize, cellsize, timestep, horizon, snapshottime) VALUES "
       +simulations_values+";"
     
@@ -226,6 +228,19 @@ const startSimulation = async (req, res) => {
       })
     })
   })
+
+    //pool.query("DELETE FROM requests", (error, result) => {
+    //  pool.query("DELETE FROM requests", (error, result) => {
+    //    pool.query(simulations_sql, (error, result) => {
+    //      pool.query(initialstate_sql, (error, result) => {
+    //        pool.query(putRequest(simulationId, "start"), (error, result) => {
+    //          return res.status(200).json(simulationId)
+    //        })
+    //      })
+    //    })
+    //  })
+    //})
+  //})
 }
 
 const getCoords = (request, response) => {
