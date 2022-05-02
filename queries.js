@@ -5,7 +5,7 @@ const crypto = require("crypto");
 const Pool = require("pg").Pool
 const compression = require('compression')
 
-const env = 'prod'
+const env = 'dev'
 var pool
 var maps
 
@@ -101,16 +101,27 @@ const stopSimulation = async (req, res) => {
 
 const startSimulation = async (req, res) => {
   var jsonInitState = req.body
-  sortArray(jsonInitState.features, {
-    by: 'id',
-    computed: {
-      id: row => row.properties.id
-    }
-  })
+  //sortArray(jsonInitState.features, {
+  //  by: 'id',
+  //  computed: {
+  //    id: row => row.properties.id
+  //  }
+  //})
+
+  //for (let i = 0; i < jsonInitState.features.length-(jsonInitState.features.length - 100); i++) {
+  //  console.log(jsonInitState.features[i].properties)
+  //}
+
+  var swx = req.body.swx
+  var swy = req.body.swy
+  var xsize = req.body.xsize
+  var ysize = req.body.ysize
+  var horizon = req.body.horizon
+  var snapshottime = req.body.snapshottime
 
   var simulationId = Math.floor(100000000 + Math.random() * 900000000);   // 9 digits random id
-  var swx = jsonInitState.features[0].geometry.coordinates[0][0][0]   // south-west point of Area of Interest
-  var swy = jsonInitState.features[0].geometry.coordinates[0][0][1]
+  //var swx = jsonInitState.features[0].geometry.coordinates[0][0][0]   // south-west point of Area of Interest
+  //var swy = jsonInitState.features[0].geometry.coordinates[0][0][1]
   var d = new Date
   var initialtime = [d.getFullYear(),
              d.getMonth()+1,
@@ -118,30 +129,31 @@ const startSimulation = async (req, res) => {
             [d.getHours(),
              d.getMinutes(),
              d.getSeconds()].join(":");
-  console.log(initialtime)
+
   // xsize = xcoord_of_north-east_cell - xcoord_of_south-west_cell
-  var xsize = Math.floor((jsonInitState.features[jsonInitState.features.length - 1].geometry.coordinates[0][0][0] - swx) / 10) + 1
-  var ysize = Math.floor((jsonInitState.features[jsonInitState.features.length - 1].geometry.coordinates[0][0][1] - swy) / 10) + 1
+  //var xsize = Math.floor((jsonInitState.features[jsonInitState.features.length - 1].geometry.coordinates[0][0][0] - swx) / 10) + 1
+  //var ysize = Math.floor((jsonInitState.features[jsonInitState.features.length - 1].geometry.coordinates[0][0][1] - swy) / 10) + 1
   var placename = crypto.randomBytes(10).toString("hex")
-  var horizon = jsonInitState.horizon
-  var snapshottime = jsonInitState.snapshottime
   
   // Somethimes in production (with larger grids) the difference is negative, so the following code is needed to not insert invalid
   // data into the database.
-  if (xsize < 0) {
-    var xsize = Math.floor((swx - jsonInitState.features[jsonInitState.features.length - 1].geometry.coordinates[0][0][0]) / 10) + 1
-  } else if (ysize < 0) {
-    var ysize = Math.floor((swy - jsonInitState.features[jsonInitState.features.length - 1].geometry.coordinates[0][0][1]) / 10) + 1
-  }
+  //if (xsize < 0) {
+  //  var xsize = Math.floor((swx - jsonInitState.features[jsonInitState.features.length - 1].geometry.coordinates[0][0][0]) / 10) + 1
+  //} else if (ysize < 0) {
+  //  var ysize = Math.floor((swy - jsonInitState.features[jsonInitState.features.length - 1].geometry.coordinates[0][0][1]) / 10) + 1
+  //}
 
   console.log(xsize)
   console.log(ysize)
 
-  if (xsize < 0 || ysize < 0) {
-    let err = "Size of the grid is less then 0. This is probably caused by an internal server error."
-    console.error(err)
-    return res.status(500).send(err)
-  }
+  console.log(swx)
+  console.log(swy)
+
+  //if (xsize < 0 || ysize < 0) {
+  //  let err = "Size of the grid is less then 0. This is probably caused by an internal server error."
+  //  console.error(err)
+  //  return res.status(500).send(err)
+  //}
   
   pool.connect((err, client, done) => {
     const shouldAbort = err => {
@@ -183,18 +195,16 @@ const startSimulation = async (req, res) => {
         return res.status(500).send(error)
       }
 
-      client.query("DELETE FROM requests", (error, result) => {
+      client.query("SELECT * FROM requests", (error, result) => {
         if (shouldAbort(error)) {
           console.log(error)
           return res.status(500).send(error)
         }
-
-        client.query("DELETE FROM initialstate", (error, result) => {
-          if (shouldAbort(error)) {
-            console.log(error)
-            return res.status(500).send(error)
-          }
-
+        if (result.rows.length > 0) {
+          let e = "Table Requests is still full."
+          console.log(e)
+          return res.status(500).send(e)
+        } else {
           client.query(simulations_sql, (error, result) => {
             if (shouldAbort(error)) {
               console.log(error)
@@ -224,7 +234,7 @@ const startSimulation = async (req, res) => {
               })
             })
           })
-        })
+        }
       })
     })
   })
