@@ -43,6 +43,7 @@ app.use(
 app.use(bodyParser.json())
 
 const getGrid = async (req, res, next) => {
+  console.log("getGrid()")
   var coords = [parseInt(req.params.x0), parseInt(req.params.xn), parseInt(req.params.y0), parseInt(req.params.yn)]
   pool.query("SELECT swx, swy FROM "+maps+" WHERE (swx >= "+coords[0]+" AND swx <= "+coords[1]+") "+
     "AND (swy >= "+coords[2]+" AND swy <= "+coords[3]+")", (error, result) => {
@@ -143,12 +144,6 @@ const startSimulation = async (req, res) => {
   //  var ysize = Math.floor((swy - jsonInitState.features[jsonInitState.features.length - 1].geometry.coordinates[0][0][1]) / 10) + 1
   //}
 
-  console.log(xsize)
-  console.log(ysize)
-
-  console.log(swx)
-  console.log(swy)
-
   //if (xsize < 0 || ysize < 0) {
   //  let err = "Size of the grid is less then 0. This is probably caused by an internal server error."
   //  console.error(err)
@@ -170,11 +165,10 @@ const startSimulation = async (req, res) => {
       return !!err
     }
 
-    var simulations_values = "("+simulationId+", "+swx+", "+swy+", '"+initialtime+"', '"+placename+"', "+xsize+", "+ysize+", "+10+", "+0.1+", "+horizon+", "+snapshottime+")"
-    var simulations_sql = "INSERT INTO simulations (simulationid, swx, swy, initialtime, placename, xsize, ysize, cellsize, timestep, horizon, snapshottime) VALUES "
-      +simulations_values+";"
-    
-    console.log(simulations_sql)
+    var maxcoords_sql = "SELECT swx, swy FROM initialstate WHERE swx = (SELECT MAX(swx) FROM initialstate) "
+                                                          +"AND swy = (SELECT MAX(swy) FROM initialstate)"
+    var mincoords_sql = "SELECT swx, swy FROM initialstate WHERE swx = (SELECT MIN(swx) FROM initialstate) "
+                                                          +"AND swy = (SELECT MIN(swy) FROM initialstate)"
 
     var initialstate_values = "("
     for (let i = 0; i < jsonInitState.features.length; i++) {
@@ -188,53 +182,74 @@ const startSimulation = async (req, res) => {
     }
     initialstate_sql = "INSERT INTO initialstate (simulationid, swx, swy, fire) VALUES "+initialstate_values+";"
 
-    // Begin transaction
-    client.query("BEGIN", error => {
-      if (shouldAbort(error)) {
-        console.log(error)
-        return res.status(500).send(error)
-      }
+    client.query(initialstate_sql, (error, result) => {
+      client.query(maxcoords_sql, (error, result) => {
+        console.log(result.rows)
+        let maxswx = result.rows[0].swx
+        let maxswy = result.rows[0].swy
 
-      client.query("SELECT * FROM requests", (error, result) => {
-        if (shouldAbort(error)) {
-          console.log(error)
-          return res.status(500).send(error)
-        }
-        if (result.rows.length > 0) {
-          let e = "Table Requests is still full."
-          console.log(e)
-          return res.status(500).send(e)
-        } else {
-          client.query(simulations_sql, (error, result) => {
+        client.query(mincoords_sql, (error, result) => {
+          console.log(result.rows)
+          var minswx = result.rows[0].swx
+          var minswy = result.rows[0].swy
+          var xsize = 1 + ((maxswx - minswx) / 10)
+          var ysize = 1 + ((maxswy - minswy) / 10)
+          console.log(xsize)
+          console.log(ysize)
+
+          console.log(minswx)
+          console.log(maxswx)
+          console.log(minswy)
+          console.log(maxswy)
+
+          // Begin transaction
+          client.query("BEGIN", error => {
             if (shouldAbort(error)) {
               console.log(error)
               return res.status(500).send(error)
             }
 
-            client.query(initialstate_sql, (error, result) => {
+            client.query("SELECT * FROM requests", (error, result) => {
               if (shouldAbort(error)) {
                 console.log(error)
                 return res.status(500).send(error)
               }
+              if (result.rows.length > 0) {
+                let e = "Table Requests is still full."
+                console.log(e)
+                return res.status(500).send(e)
+              } else {
+                var simulations_values = "("+simulationId+", "+minswx+", "+minswy+", '"+initialtime+"', '"+placename+"', "+xsize+", "+ysize+", "+10+", "+0.1+", "+horizon+", "+snapshottime+")"
+                var simulations_sql = "INSERT INTO simulations (simulationid, swx, swy, initialtime, placename, xsize, ysize, cellsize, timestep, horizon, snapshottime) VALUES "
+                  +simulations_values+";"
+                console.log(simulations_sql)
 
-              client.query(putRequest(simulationId, "start"), (error, result) => {
-                if (shouldAbort(error)) {
-                  console.log(error)
-                  return res.status(500).send(error)
-                }
-
-                client.query("COMMIT", error => {
+                client.query(simulations_sql, (error, result) => {
                   if (shouldAbort(error)) {
                     console.log(error)
                     return res.status(500).send(error)
                   }
-                  done()
-                  return res.status(200).json(simulationId)
+
+                  client.query(putRequest(simulationId, "start"), (error, result) => {
+                    if (shouldAbort(error)) {
+                      console.log(error)
+                      return res.status(500).send(error)
+                    }
+
+                    client.query("COMMIT", error => {
+                      if (shouldAbort(error)) {
+                        console.log(error)
+                        return res.status(500).send(error)
+                      }
+                      done()
+                      return res.status(200).json(simulationId)
+                    })
+                  })
                 })
-              })
+              }
             })
           })
-        }
+        })
       })
     })
   })
