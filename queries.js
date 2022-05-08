@@ -1,11 +1,10 @@
 const express = require("express")
 const bodyParser = require("body-parser")
-const sortArray = require('sort-array')
 const crypto = require("crypto");
 const Pool = require("pg").Pool
 const compression = require('compression')
 
-const env = 'dev'
+const env = 'local'
 var pool
 var maps
 
@@ -74,9 +73,11 @@ const getSnapshot = async (req, res) => {
   var simulationId = req.params.id
   var elapsedminutes = req.params.elapsedminutes
   var snapshottime = req.params.snapshottime
-  var query = "SELECT swx, swy, fire, elapsedminutes FROM simulatorsnapshots WHERE (simulationid = "+simulationId+") AND "
+  //var query = "SELECT swx, swy, fire, elapsedminutes FROM simulatorsnapshots WHERE (simulationid = "+simulationId+") AND "
+  //          + "(elapsedminutes <= "+elapsedminutes+") AND (elapsedminutes > "+(elapsedminutes-snapshottime)+");"
+  var query = "SELECT swx, swy, fire, elapsedminutes FROM simulatorsnapshots WHERE "
             + "(elapsedminutes <= "+elapsedminutes+") AND (elapsedminutes > "+(elapsedminutes-snapshottime)+");"
-
+  console.log(query)
   pool.query(query, (error, result) => {
     if (error) {
       console.error(error)
