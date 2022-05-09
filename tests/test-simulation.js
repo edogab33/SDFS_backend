@@ -64,11 +64,25 @@ if (grid != '') {
           return
         }
       })
-      if (JSON.stringify(grid) != JSON.stringify(snapshot0)) {
-        console.error("Test 1 failed: Grids are different.")
-        return
+      if (snapshot1.features.length != grid.features.length) {
+        console.error("Test 1 failed: Snapshot0 grid and initialstate grid have different length.")
+        console.error("Snapshot0 has length "+snapshot0.features.length+ "and initialstate has "+grid.features.length)
       } else {
         console.log("Test 1 passed.")
+      }
+      for (let x of snapshot0.features) {
+        for (let y of grid.features) {
+          if (JSON.stringify(x.geometry.coordinates) === JSON.stringify(y.geometry.coordinates)) {
+            if (x.properties.fire == y.properties.fire) {
+              console.error("Test 2 failed: Initialstate cell has "+x.properties.fire+", but snapshot0 cell has "+y.properties.fire+".")
+              console.error("Comparing cells (snapshot0): "+x.geometry.coordinates)
+              console.error("And (initialstate): "+y.geometry.coordinates)
+            }
+            break
+          }
+          console.error("Test 3 failed: Snapshot0 grid and initialstate grid have different coordinates.")
+          console.error("Namely, snapshot1 cell "+x+" is not in initialstate.")
+        }
       }
 
       // Take the first snapshot after time 0 and check its correctness
@@ -84,24 +98,28 @@ if (grid != '') {
         // Check that all polygons in snapshot1 are also in grid
         // Check that all cells that have fire=1 in grid, have fire!=0 in snapshot1
         if (snapshot1.features.length != grid.features.length) {
-          console.error("Test 2 failed: Snapshot grid and initialstate grid have different length.")
+          console.error("Test 4 failed: Snapshot grid and initialstate grid have different length.")
+          console.error("Snapshot1 has length "+snapshot1.features.length+ "and initialstate has "+grid.features.length)
         } else {
-          console.log("Test 2 passed.")
+          console.log("Test 4 passed.")
         }
         for (let x of snapshot1.features) {
           for (let y of grid.features) {
             if (JSON.stringify(x.geometry.coordinates) === JSON.stringify(y.geometry.coordinates)) {
               if (y.properties.fire == 1) {
                 if (x.properties.fire == 0) {
-                  console.error("Test 4 failed: Initialstate cell has 1, but snapshot cell has 0.")
+                  console.error("Test 6 failed: Initialstate cell has 1, but snapshot cell has 0.")
+                  console.error("Comparing cells (snapshot1): "+x.geometry.coordinates)
+                  console.error("And (initialstate): "+y.geometry.coordinates)
                 }
               }
               break
             }
-            console.error("Test 3 failed: Snapshot grid and initialstate grid have different coordinates.")
+            console.error("Test 5 failed: Snapshot grid and initialstate grid have different coordinates.")
+            console.error("Namely, snapshot1 cell "+x+" is not in initialstate.")
           }
         }
-        console.log("Test 3 and 4 passed.")
+        console.log("Test 5 and 6 passed.")
       })
       .catch(error => {
         if (error.response) {
