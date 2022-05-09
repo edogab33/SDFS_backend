@@ -64,7 +64,7 @@ if (grid != '') {
           return
         }
       })
-      if (snapshot1.features.length != grid.features.length) {
+      if (snapshot0.features.length != grid.features.length) {
         console.error("Test 1 failed: Snapshot0 grid and initialstate grid have different length.")
         console.error("Snapshot0 has length "+snapshot0.features.length+ "and initialstate has "+grid.features.length)
       } else {
@@ -81,7 +81,7 @@ if (grid != '') {
             break
           }
           console.error("Test 3 failed: Snapshot0 grid and initialstate grid have different coordinates.")
-          console.error("Namely, snapshot1 cell "+x+" is not in initialstate.")
+          console.error("Namely, snapshot0 cell "+x+" is not in initialstate.")
         }
       }
 
