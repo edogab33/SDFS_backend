@@ -70,20 +70,27 @@ if (grid != '') {
       } else {
         console.log("Test 1 passed.")
       }
+      let ok = false
       for (let x of snapshot0.features) {
         for (let y of grid.features) {
           if (JSON.stringify(x.geometry.coordinates) === JSON.stringify(y.geometry.coordinates)) {
-            if (x.properties.fire == y.properties.fire) {
+            ok = true
+            if (x.properties.fire != y.properties.fire) {
               console.error("Test 2 failed: Initialstate cell has "+x.properties.fire+", but snapshot0 cell has "+y.properties.fire+".")
               console.error("Comparing cells (snapshot0): "+x.geometry.coordinates)
               console.error("And (initialstate): "+y.geometry.coordinates)
             }
             break
           }
+        }
+        if (!ok) {
           console.error("Test 3 failed: Snapshot0 grid and initialstate grid have different coordinates.")
-          console.error("Namely, snapshot0 cell "+x+" is not in initialstate.")
+          console.error("Namely, snapshot0 cell "+x.geometry.coordinates+" is not in initialstate.")
+          return
         }
       }
+
+      console.log("Test 2 and 3 passed.")
 
       // Take the first snapshot after time 0 and check its correctness
       retryGetSnapshot(simulationId, 10, 10).then(res => {
@@ -103,9 +110,11 @@ if (grid != '') {
         } else {
           console.log("Test 4 passed.")
         }
+        ok = false
         for (let x of snapshot1.features) {
           for (let y of grid.features) {
             if (JSON.stringify(x.geometry.coordinates) === JSON.stringify(y.geometry.coordinates)) {
+              ok = true
               if (y.properties.fire == 1) {
                 if (x.properties.fire == 0) {
                   console.error("Test 6 failed: Initialstate cell has 1, but snapshot cell has 0.")
@@ -115,51 +124,27 @@ if (grid != '') {
               }
               break
             }
+          }
+          if (!ok) {
             console.error("Test 5 failed: Snapshot grid and initialstate grid have different coordinates.")
-            console.error("Namely, snapshot1 cell "+x+" is not in initialstate.")
+            console.error("Namely, snapshot1 cell "+x.geometry.coordinates+" is not in initialstate.")
+            return
           }
         }
         console.log("Test 5 and 6 passed.")
       })
       .catch(error => {
-        if (error.response) {
-          console.log(error.response.data);
-          console.log(error.response.status);
-          console.log(error.response.headers);
-        } else if (error.request) {
-          console.log(error.request);
-        } else {
-          console.log('Error', error.message);
-        }
-        console.log(error.config);
+        console.error(error)
         return
       })
     })
     .catch(error => {
-      if (error.response) {
-        console.log(error.response.data);
-        console.log(error.response.status);
-        console.log(error.response.headers);
-      } else if (error.request) {
-        console.log(error.request);
-      } else {
-        console.log('Error', error.message);
-      }
-      console.log(error.config);
+      console.error(error)
       return
     })
   })
   .catch(error => {
-    if (error.response) {
-      console.log(error.response.data);
-      console.log(error.response.status);
-      console.log(error.response.headers);
-    } else if (error.request) {
-      console.log(error.request);
-    } else {
-      console.log('Error', error.message);
-    }
-    console.log(error.config);
+    console.error(error)
     return
   })
 }
